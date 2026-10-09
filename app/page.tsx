@@ -12,28 +12,74 @@ type Template={id:string;name:string;meal_type:MealType;description:string;food_
 
 export default function Home(){
  const [loading,setLoading]=useState(true),[signedIn,setSignedIn]=useState(false),[message,setMessage]=useState("");
- const [trendDays,setTrendDays]=useState(7),[trendLogs,setTrendLogs]=useState<any[]>([]);\n const [foods,setFoods]=useState<Food[]>([]),[templates,setTemplates]=useState<Template[]>([]),[preferences,setPreferences]=useState<Record<string,Preference>>({}),[recentMeals,setRecentMeals]=useState<Meal[]>([]),[meals,setMeals]=useState<Meal[]>([]);
- const [healthStatus,setHealthStatus]=useState("Well"),[stoolType,setStoolType]=useState("Not logged"),[energy,setEnergy]=useState(3),[water,setWater]=useState(0),[pain,setPain]=useState(0),[urgency,setUrgency]=useState(0),[notes,setNotes]=useState("");\n const [stoolCount,setStoolCount]=useState(0),[sleepHours,setSleepHours]=useState(""),[bloating,setBloating]=useState(0),[cramping,setCramping]=useState(0),[appetite,setAppetite]=useState(3),[bloodSeen,setBloodSeen]=useState(false),[mucusSeen,setMucusSeen]=useState(false);
+ const [trendDays,setTrendDays]=useState(7),[trendLogs,setTrendLogs]=useState<any[]>([]);
+ const [foods,setFoods]=useState<Food[]>([]),[templates,setTemplates]=useState<Template[]>([]),[preferences,setPreferences]=useState<Record<string,Preference>>({}),[recentMeals,setRecentMeals]=useState<Meal[]>([]),[meals,setMeals]=useState<Meal[]>([]);
+ const [healthStatus,setHealthStatus]=useState("Well"),[stoolType,setStoolType]=useState("Not logged"),[energy,setEnergy]=useState(3),[water,setWater]=useState(0),[pain,setPain]=useState(0),[urgency,setUrgency]=useState(0),[notes,setNotes]=useState("");
+ const [stoolCount,setStoolCount]=useState(0),[sleepHours,setSleepHours]=useState(""),[bloating,setBloating]=useState(0),[cramping,setCramping]=useState(0),[appetite,setAppetite]=useState(3),[bloodSeen,setBloodSeen]=useState(false),[mucusSeen,setMucusSeen]=useState(false);
  const [mealType,setMealType]=useState<MealType>("breakfast"),[selectedFoodIds,setSelectedFoodIds]=useState<string[]>([]),[customFood,setCustomFood]=useState(""),[portion,setPortion]=useState(""),[symptomsAfter,setSymptomsAfter]=useState(""),[mealNotes,setMealNotes]=useState(""),[foodSearch,setFoodSearch]=useState("");
  const today=new Date().toISOString().slice(0,10);
 
- useEffect(()=>{(async()=>{const s=createClient();const {data:{user}}=await s.auth.getUser();setSignedIn(!!user);
+ useEffect(()=>{(async()=>{const s=createClient();
+ const {data:{user}}=await s.auth.getUser();setSignedIn(!!user);
   const {data:fs}=await s.from("food_catalog").select("id,name,category,default_portion").order("name");setFoods((fs as Food[])||[]);
   const {data:ts}=await s.from("meal_templates").select("*").eq("is_active",true).order("meal_type,name");setTemplates((ts as Template[])||[]);
-  if(user){await loadToday(user.id);await loadHistory(user.id);const {data:trend}=await s.from("daily_logs").select("log_date,pain_score,urgency_score,bloating_score,cramping_score,energy_score,water_glasses,stool_count,blood_seen,mucus_seen").eq("user_id",user.id).gte("log_date",new Date(Date.now()-30*86400000).toISOString().slice(0,10)).order("log_date",{ascending:false});setTrendLogs(trend||[]);const {data:d}=await s.from("daily_logs").select("*").eq("user_id",user.id).eq("log_date",today).maybeSingle();if(d){setHealthStatus(d.health_status||"Well");setStoolType(d.stool_type||"Not logged");setEnergy(d.energy_score??3);setWater(d.water_glasses??0);setPain(d.pain_score??0);setUrgency(d.urgency_score??0);setNotes(d.notes||"");setStoolCount(d.stool_count??0);setSleepHours(d.sleep_hours==null?"":String(d.sleep_hours));setBloating(d.bloating_score??0);setCramping(d.cramping_score??0);setAppetite(d.appetite_score??3);setBloodSeen(!!d.blood_seen);setMucusSeen(!!d.mucus_seen);}const {data:p}=await s.from("user_food_preferences").select("food_id,preference,tolerance").eq("user_id",user.id);setPreferences(Object.fromEntries(((p as Preference[])||[]).map(x=>[x.food_id,x])));}
+  if(user){await loadToday(user.id);await loadHistory(user.id);
+  const {data:trend}=await s.from("daily_logs").select("log_date,pain_score,urgency_score,bloating_score,cramping_score,energy_score,water_glasses,stool_count,blood_seen,mucus_seen").eq("user_id",user.id).gte("log_date",new Date(Date.now()-30*86400000).toISOString().slice(0,10)).order("log_date",{ascending:false});setTrendLogs(trend||[]);
+  const {data:d}=await s.from("daily_logs").select("*").eq("user_id",user.id).eq("log_date",today).maybeSingle();
+  if(d){setHealthStatus(d.health_status||"Well");
+    setStoolType(d.stool_type||"Not logged");
+    setEnergy(d.energy_score??3);
+    setWater(d.water_glasses??0);
+    setPain(d.pain_score??0);
+    setUrgency(d.urgency_score??0);
+    setNotes(d.notes||"");
+    setStoolCount(d.stool_count??0);
+    setSleepHours(d.sleep_hours==null?"":String(d.sleep_hours));
+    setBloating(d.bloating_score??0);
+    setCramping(d.cramping_score??0);
+    setAppetite(d.appetite_score??3);
+    setBloodSeen(!!d.blood_seen);
+    setMucusSeen(!!d.mucus_seen);
+  }
+  const {data:p}=await s.from("user_food_preferences").select("food_id,preference,tolerance").eq("user_id",user.id);
+  setPreferences(Object.fromEntries(((p as Preference[])||[]).map(x=>[x.food_id,x])));
+}
   setLoading(false);})();},[]);
 
- async function loadToday(userId:string){const s=createClient(),start=new Date(today+"T00:00:00").toISOString(),end=new Date(today+"T23:59:59.999").toISOString();const {data}=await s.from("meal_logs").select("*").eq("user_id",userId).gte("eaten_at",start).lte("eaten_at",end).order("eaten_at",{ascending:false});setMeals((data as Meal[])||[]);}
- async function loadHistory(userId:string){const since=new Date(Date.now()-7*86400000).toISOString();const {data}=await createClient().from("meal_logs").select("*").eq("user_id",userId).gte("eaten_at",since).order("eaten_at",{ascending:false});setRecentMeals((data as Meal[])||[]);}
+ async function loadToday(userId:string){const s=createClient(),start=new Date(today+"T00:00:00").toISOString(),end=new Date(today+"T23:59:59.999").toISOString();
+ const {data}=await s.from("meal_logs").select("*").eq("user_id",userId).gte("eaten_at",start).lte("eaten_at",end).order("eaten_at",{ascending:false});setMeals((data as Meal[])||[]);}
+ async function loadHistory(userId:string){const since=new Date(Date.now()-7*86400000).toISOString();
+ const {data}=await createClient().from("meal_logs").select("*").eq("user_id",userId).gte("eaten_at",since).order("eaten_at",{ascending:false});setRecentMeals((data as Meal[])||[]);}
  const recentFoods=useMemo(()=>new Set(recentMeals.flatMap(m=>m.food_name.toLowerCase().split(",").map(x=>x.trim()))),[recentMeals]);
  const allowed=useMemo(()=>new Set(foods.filter(f=>!["avoid","unavailable"].includes(preferences[f.id]?.preference||"")).map(f=>f.id)),[foods,preferences]);
- const rankedTemplates=useMemo(()=>templates.filter(t=>t.meal_type===mealType).map(t=>{const recent=t.food_ids.filter(id=>recentFoods.has(foods.find(f=>f.id===id)?.name.toLowerCase()||""));const blocked=t.food_ids.filter(id=>!allowed.has(id));const liked=t.food_ids.filter(id=>preferences[id]?.preference==="like"||preferences[id]?.tolerance==="tolerated");return {...t,recentCount:recent.length,blockedCount:blocked.length,likedCount:liked.length};}).filter(t=>t.blockedCount===0).sort((a,b)=>(b.likedCount-a.likedCount)||(a.recentCount-b.recentCount))),[templates,mealType,recentFoods,allowed,preferences,foods]);
- const selectedTemplate=rankedTemplates[0];\n const visibleTrend=trendLogs.filter(x=>x.log_date>=new Date(Date.now()-(trendDays-1)*86400000).toISOString().slice(0,10));\n const average=(key:string)=>{const values=visibleTrend.map(x=>x[key]).filter((v:any)=>typeof v==="number");return values.length?(values.reduce((a:number,b:number)=>a+b,0)/values.length).toFixed(1):"—"};
+ const rankedTemplates=useMemo(()=>templates.filter(t=>t.meal_type===mealType).map(t=>{const recent=t.food_ids.filter(id=>recentFoods.has(foods.find(f=>f.id===id)?.name.toLowerCase()||""));
+ const blocked=t.food_ids.filter(id=>!allowed.has(id));
+ const liked=t.food_ids.filter(id=>preferences[id]?.preference==="like"||preferences[id]?.tolerance==="tolerated");return {...t,recentCount:recent.length,blockedCount:blocked.length,likedCount:liked.length};}).filter(t=>t.blockedCount===0).sort((a,b)=>(b.likedCount-a.likedCount)||(a.recentCount-b.recentCount)),[templates,mealType,recentFoods,allowed,preferences,foods]);
+ const selectedTemplate=rankedTemplates[0];
+ const visibleTrend=trendLogs.filter(x=>x.log_date>=new Date(Date.now()-(trendDays-1)*86400000).toISOString().slice(0,10));
+ const average=(key:string)=>{const values=visibleTrend.map(x=>x[key]).filter((v:any)=>typeof v==="number");return values.length?(values.reduce((a:number,b:number)=>a+b,0)/values.length).toFixed(1):"—"};
 
  function useTemplate(t:Template){setMealType(t.meal_type);setSelectedFoodIds(t.food_ids.filter(id=>allowed.has(id)));setCustomFood("");setMealNotes(t.description);window.scrollTo({top:document.body.scrollHeight,behavior:"smooth"});}
  async function saveCheckin(){const s=createClient(),{data:{user}}=await s.auth.getUser();if(!user){location.href="/auth";return;}const {error}=await s.from("daily_logs").upsert({user_id:user.id,log_date:today,health_status:healthStatus,stool_type:stoolType,pain_score:pain,urgency_score:urgency,energy_score:energy,water_glasses:water,stool_count:stoolCount,sleep_hours:sleepHours===""?null:Number(sleepHours),bloating_score:bloating,cramping_score:cramping,appetite_score:appetite,blood_seen:bloodSeen,mucus_seen:mucusSeen,notes:notes||null},{onConflict:"user_id,log_date"});setMessage(error?error.message:"Today's private check-in was saved.");}
- async function addMeal(){const names=[...foods.filter(f=>selectedFoodIds.includes(f.id)).map(f=>f.name),...customFood.split(",").map(x=>x.trim()).filter(Boolean)];if(!names.length){setMessage("Choose a food or add a custom food.");return;}const s=createClient(),{data:{user}}=await s.auth.getUser();if(!user){location.href="/auth";return;}const {error}=await s.from("meal_logs").insert({user_id:user.id,meal_type:mealType,food_name:names.join(", "),portion:portion||null,symptoms_after:symptomsAfter||null,notes:mealNotes||null});if(error){setMessage(error.message);return;}setSelectedFoodIds([]);setCustomFood("");setPortion("");setMealNotes("");setSymptomsAfter("");await loadToday(user.id);await loadHistory(user.id);setMessage("Meal saved privately.");}
- async function savePreference(foodId:string,preference:string,tolerance?:string){const s=createClient(),{data:{user}}=await s.auth.getUser();if(!user){location.href="/auth";return;}const prev=preferences[foodId],next={food_id:foodId,preference,tolerance:tolerance||prev?.tolerance||"unknown"};const {error}=await s.from("user_food_preferences").upsert({user_id:user.id,...next},{onConflict:"user_id,food_id"});if(error){setMessage(error.message);return;}setPreferences(x=>({...x,[foodId]:next}));}
+ async function addMeal(){const names=[...foods.filter(f=>selectedFoodIds.includes(f.id)).map(f=>f.name),...customFood.split(",").map(x=>x.trim()).filter(Boolean)];if(!names.length){setMessage("Choose a food or add a custom food.");return;}
+ const s=createClient(),{data:{user}}=await s.auth.getUser();if(!user){location.href="/auth";return;}const {error}=await s.from("meal_logs").insert({user_id:user.id,meal_type:mealType,food_name:names.join(", "),portion:portion||null,symptoms_after:symptomsAfter||null,notes:mealNotes||null});
+ if(error){setMessage(error.message);return;}
+ setSelectedFoodIds([]);
+ setCustomFood("");
+ setPortion("");
+ setMealNotes("");
+ setSymptomsAfter("");
+ await loadToday(user.id);
+ await loadHistory(user.id);
+ setMessage("Meal saved privately.");}
+ async function savePreference(foodId:string,preference:string,tolerance?:string){const s=createClient(),{data:{user}}=await s.auth.getUser();
+ if(!user)
+    {location.href="/auth";return;}
+ const prev=preferences[foodId],next={food_id:foodId,preference,tolerance:tolerance||prev?.tolerance||"unknown"};
+ const {error}=await s.from("user_food_preferences").upsert({user_id:user.id,...next},{onConflict:"user_id,food_id"});
+ if(error){setMessage(error.message);
+    return;}
+    setPreferences(x=>({...x,[foodId]:next}));}
  async function deleteMeal(id:string){const {error}=await createClient().from("meal_logs").delete().eq("id",id);if(error){setMessage(error.message);return;}setMeals(x=>x.filter(m=>m.id!==id));setRecentMeals(x=>x.filter(m=>m.id!==id));}
  async function signOut(){await createClient().auth.signOut();location.href="/auth";}
  if(loading)return <main><p>Loading your private dashboard…</p></main>;
