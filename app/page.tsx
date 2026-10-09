@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "../lib/supabase/client";
+import { getLocalDateString, getDateDaysAgo } from "../lib/date-utils";
+import type { TrendLog } from "../lib/pendafood-types";
 
 const healthOptions=["Well","Mild","Moderate","Severe"], stoolOptions=["Not logged","Formed","Loose","Watery","Constipated"], mealTypes=["breakfast","lunch","dinner"] as const;
 type MealType=typeof mealTypes[number];
@@ -11,20 +13,45 @@ type Preference={food_id:string;preference:string;tolerance:string};
 type Template={id:string;name:string;meal_type:MealType;description:string;food_ids:string[];substitution_note:string|null};
 
 export default function Home(){
- const [loading,setLoading]=useState(true),[signedIn,setSignedIn]=useState(false),[message,setMessage]=useState("");
- const [trendDays,setTrendDays]=useState(7),[trendLogs,setTrendLogs]=useState<any[]>([]);
- const [foods,setFoods]=useState<Food[]>([]),[templates,setTemplates]=useState<Template[]>([]),[preferences,setPreferences]=useState<Record<string,Preference>>({}),[recentMeals,setRecentMeals]=useState<Meal[]>([]),[meals,setMeals]=useState<Meal[]>([]);
- const [healthStatus,setHealthStatus]=useState("Well"),[stoolType,setStoolType]=useState("Not logged"),[energy,setEnergy]=useState(3),[water,setWater]=useState(0),[pain,setPain]=useState(0),[urgency,setUrgency]=useState(0),[notes,setNotes]=useState("");
- const [stoolCount,setStoolCount]=useState(0),[sleepHours,setSleepHours]=useState(""),[bloating,setBloating]=useState(0),[cramping,setCramping]=useState(0),[appetite,setAppetite]=useState(3),[bloodSeen,setBloodSeen]=useState(false),[mucusSeen,setMucusSeen]=useState(false);
- const [mealType,setMealType]=useState<MealType>("breakfast"),[selectedFoodIds,setSelectedFoodIds]=useState<string[]>([]),[customFood,setCustomFood]=useState(""),[portion,setPortion]=useState(""),[symptomsAfter,setSymptomsAfter]=useState(""),[mealNotes,setMealNotes]=useState(""),[foodSearch,setFoodSearch]=useState("");
- const today=new Date().toISOString().slice(0,10);
+ const [loading, setLoading] = useState(true);
+  const [signedIn, setSignedIn] = useState(false);
+  const [message, setMessage] = useState("");
+ const [trendDays, setTrendDays] = useState(7);
+  const [trendLogs, setTrendLogs] = useState<TrendLog[]>([]);
+ const [foods, setFoods] = useState<Food[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [preferences, setPreferences] = useState<Record<string, Preference>>({});
+  const [recentMeals, setRecentMeals] = useState<Meal[]>([]);
+  const [meals, setMeals] = useState<Meal[]>([]);
+ const [healthStatus, setHealthStatus] = useState("Well");
+  const [stoolType, setStoolType] = useState("Not logged");
+  const [energy, setEnergy] = useState(3);
+  const [water, setWater] = useState(0);
+  const [pain, setPain] = useState(0);
+  const [urgency, setUrgency] = useState(0);
+  const [notes, setNotes] = useState("");
+ const [stoolCount, setStoolCount] = useState(0);
+  const [sleepHours, setSleepHours] = useState("");
+  const [bloating, setBloating] = useState(0);
+  const [cramping, setCramping] = useState(0);
+  const [appetite, setAppetite] = useState(3);
+  const [bloodSeen, setBloodSeen] = useState(false);
+  const [mucusSeen, setMucusSeen] = useState(false);
+ const [mealType, setMealType] = useState<MealType>("breakfast");
+  const [selectedFoodIds, setSelectedFoodIds] = useState<string[]>([]);
+  const [customFood, setCustomFood] = useState("");
+  const [portion, setPortion] = useState("");
+  const [symptomsAfter, setSymptomsAfter] = useState("");
+  const [mealNotes, setMealNotes] = useState("");
+  const [foodSearch, setFoodSearch] = useState("");
+ const today = getLocalDateString();
 
  useEffect(()=>{(async()=>{const s=createClient();
  const {data:{user}}=await s.auth.getUser();setSignedIn(!!user);
   const {data:fs}=await s.from("food_catalog").select("id,name,category,default_portion").order("name");setFoods((fs as Food[])||[]);
   const {data:ts}=await s.from("meal_templates").select("*").eq("is_active",true).order("meal_type,name");setTemplates((ts as Template[])||[]);
   if(user){await loadToday(user.id);await loadHistory(user.id);
-  const {data:trend}=await s.from("daily_logs").select("log_date,pain_score,urgency_score,bloating_score,cramping_score,energy_score,water_glasses,stool_count,blood_seen,mucus_seen").eq("user_id",user.id).gte("log_date",new Date(Date.now()-30*86400000).toISOString().slice(0,10)).order("log_date",{ascending:false});setTrendLogs(trend||[]);
+  const {data:trend}=await s.from("daily_logs").select("log_date,pain_score,urgency_score,bloating_score,cramping_score,energy_score,water_glasses,stool_count,blood_seen,mucus_seen").eq("user_id",user.id).gte("log_date",getDateDaysAgo(30)).order("log_date",{ascending:false});setTrendLogs((trend as TrendLog[] | null) ?? []);
   const {data:d}=await s.from("daily_logs").select("*").eq("user_id",user.id).eq("log_date",today).maybeSingle();
   if(d){setHealthStatus(d.health_status||"Well");
     setStoolType(d.stool_type||"Not logged");
@@ -56,8 +83,13 @@ export default function Home(){
  const blocked=t.food_ids.filter(id=>!allowed.has(id));
  const liked=t.food_ids.filter(id=>preferences[id]?.preference==="like"||preferences[id]?.tolerance==="tolerated");return {...t,recentCount:recent.length,blockedCount:blocked.length,likedCount:liked.length};}).filter(t=>t.blockedCount===0).sort((a,b)=>(b.likedCount-a.likedCount)||(a.recentCount-b.recentCount)),[templates,mealType,recentFoods,allowed,preferences,foods]);
  const selectedTemplate=rankedTemplates[0];
- const visibleTrend=trendLogs.filter(x=>x.log_date>=new Date(Date.now()-(trendDays-1)*86400000).toISOString().slice(0,10));
- const average=(key:string)=>{const values=visibleTrend.map(x=>x[key]).filter((v:any)=>typeof v==="number");return values.length?(values.reduce((a:number,b:number)=>a+b,0)/values.length).toFixed(1):"—"};
+ const visibleTrend=trendLogs.filter(x=>x.log_date>=getDateDaysAgo(trendDays - 1));
+ const average=(key:string)=>{const values = visibleTrend
+      .map((log) => log[key])
+      .filter((value): value is number => typeof value === "number");
+    return values.length
+      ? (values.reduce((total, value) => total + value, 0) / values.length).toFixed(1)
+      : "—"};
 
  function useTemplate(t:Template){setMealType(t.meal_type);setSelectedFoodIds(t.food_ids.filter(id=>allowed.has(id)));setCustomFood("");setMealNotes(t.description);window.scrollTo({top:document.body.scrollHeight,behavior:"smooth"});}
  async function saveCheckin(){const s=createClient(),{data:{user}}=await s.auth.getUser();if(!user){location.href="/auth";return;}const {error}=await s.from("daily_logs").upsert({user_id:user.id,log_date:today,health_status:healthStatus,stool_type:stoolType,pain_score:pain,urgency_score:urgency,energy_score:energy,water_glasses:water,stool_count:stoolCount,sleep_hours:sleepHours===""?null:Number(sleepHours),bloating_score:bloating,cramping_score:cramping,appetite_score:appetite,blood_seen:bloodSeen,mucus_seen:mucusSeen,notes:notes||null},{onConflict:"user_id,log_date"});setMessage(error?error.message:"Today's private check-in was saved.");}
