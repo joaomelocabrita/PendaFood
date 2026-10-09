@@ -84,7 +84,7 @@ export default function Home(){
  const liked=t.food_ids.filter(id=>preferences[id]?.preference==="like"||preferences[id]?.tolerance==="tolerated");return {...t,recentCount:recent.length,blockedCount:blocked.length,likedCount:liked.length};}).filter(t=>t.blockedCount===0).sort((a,b)=>(b.likedCount-a.likedCount)||(a.recentCount-b.recentCount)),[templates,mealType,recentFoods,allowed,preferences,foods]);
  const selectedTemplate=rankedTemplates[0];
  const visibleTrend=trendLogs.filter(x=>x.log_date>=getDateDaysAgo(trendDays - 1));
- const average=(key:string)=>{const values = visibleTrend
+ const average = (key: keyof TrendLog) =>{const values = visibleTrend
       .map((log) => log[key])
       .filter((value): value is number => typeof value === "number");
     return values.length
